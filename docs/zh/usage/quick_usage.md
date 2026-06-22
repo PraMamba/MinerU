@@ -97,6 +97,24 @@ mineru -p <input_path> -o <output_path>
   >- `--enable-vlm-preload true` 仅作用于 router 托管的本地 worker，不会影响通过 `--upstream-url` 接入的远端服务。
   >- 适用于多服务、多 GPU 和统一入口部署场景。
 
+- 通过 `mineru-v4-adapter` 为 LLM Wiki 暴露最小 `/api/v4` 兼容接口：
+  ```bash
+  # 先启动本地 MinerU API 或 Router
+  mineru-api --host 127.0.0.1 --port 8000
+
+  # 再启动 LLM Wiki 兼容适配器
+  mineru-v4-adapter --host 127.0.0.1 --port 8888 --upstream-url http://127.0.0.1:8000
+  ```
+  >[!TIP]
+  >
+  >- 该适配器只覆盖 LLM Wiki 当前使用的 `POST /api/v4/extract/task`、`POST /api/v4/file-urls/batch`、`GET /api/v4/extract/task/{task_id}`、`GET /api/v4/extract-results/batch/{batch_id}`，以及返回的上传和结果下载 URL。
+  >- 它不是 MinerU 官方云 API 的完整复刻；不建议把未验证的第三方客户端直接接到该适配器。
+  >- LLM Wiki 中可将 `API_BASE` 配置为 `http://127.0.0.1:8888/api/v4`。适配器默认接受任意非空 Bearer Token；如需固定 Token，可设置 `MINERU_V4_ADAPTER_TOKEN` 或启动参数 `--token`。
+  >- 返回的上传 URL 和 `full_zip_url` 是一次任务范围内的能力 URL，LLM Wiki 请求这些 URL 时不携带认证头，因此适配器也不会要求认证。
+  >- 任意 URL 拉取默认关闭；LLM Wiki 设置页的固定测试 URL 会在离线模式下使用仓库内置样例文件。若确需解析公网 URL，可显式增加 `--allow-url-fetch`，适配器会限制协议、DNS 解析地址并禁止重定向。
+  >- 适配器不管理模型下载；如需强制使用本地模型，请在启动底层 `mineru-api` 或 `mineru-router` 时设置 `MINERU_MODEL_SOURCE=local`、`HF_HUB_OFFLINE=1`、`TRANSFORMERS_OFFLINE=1` 等环境变量。
+  >- 适配器任务状态为单进程内存记录，服务重启后无法继续查询适配器侧历史任务。
+
 - 使用`http-client/server`方式调用：
   ```bash
   # 启动openai兼容服务器(需要安装vllm或lmdeploy环境)
