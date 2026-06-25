@@ -791,9 +791,12 @@ class PPDocLayoutV2ForObjectDetection(RTDetrForObjectDetection):
 
     def __init__(self, config: PPDocLayoutV2Config):
         super().__init__(config)
+        # transformers 5.x moved RT-DETR prediction heads under the decoder.
+        class_embed = getattr(self, "class_embed", self.model.decoder.class_embed)
+        bbox_embed = getattr(self, "bbox_embed", self.model.decoder.bbox_embed)
         self.model = PPDocLayoutV2Model(config)
-        self.model.decoder.class_embed = self.class_embed
-        self.model.decoder.bbox_embed = self.bbox_embed
+        self.model.decoder.class_embed = class_embed
+        self.model.decoder.bbox_embed = bbox_embed
         self.reading_order = PPDocLayoutV2ReadingOrder(config.reading_order_config)
         self.num_queries = config.num_queries
         self.config = config

@@ -28,7 +28,7 @@ from torch import nn
 
 from transformers.activations import ACT2FN
 from transformers.modeling_utils import PreTrainedModel
-from transformers.pytorch_utils import find_pruneable_heads_and_indices, meshgrid, prune_linear_layer
+from transformers.pytorch_utils import meshgrid, prune_linear_layer
 from transformers.utils import (
     ModelOutput,
     add_code_sample_docstrings,
@@ -38,6 +38,21 @@ from transformers.utils import (
     torch_int,
 )
 from .configuration_unimer_swin import UnimerSwinConfig
+
+
+try:
+    from transformers.pytorch_utils import find_pruneable_heads_and_indices
+except ImportError:
+    # Transformers 5.x removed this helper, but prune_heads still needs the old behavior.
+    def find_pruneable_heads_and_indices(heads, n_heads, head_size, already_pruned_heads):
+        mask = torch.ones(n_heads, head_size)
+        heads = set(heads) - already_pruned_heads
+        for head in heads:
+            head = head - sum(1 if h < head else 0 for h in already_pruned_heads)
+            mask[head] = 0
+        mask = mask.view(-1).contiguous().eq(1)
+        index = torch.arange(len(mask))[mask].long()
+        return heads, index
 
 
 logger = logging.get_logger(__name__)
@@ -826,7 +841,7 @@ class UnimerSwinEncoder(nn.Module):
         super().__init__()
         self.num_layers = len(config.depths)
         self.config = config
-        dpr = [x.item() for x in torch.linspace(0, config.drop_path_rate, sum(config.depths))]
+        dpr = [x.item() for x in torch.linspace(0, config.drop_path_rate, sum(config.depths), device="cpu")]
         self.layers = nn.ModuleList(
             [
                 UnimerSwinStage(
@@ -946,6 +961,11 @@ class UnimerSwinPreTrainedModel(PreTrainedModel):
         elif isinstance(module, nn.LayerNorm):
             module.bias.data.zero_()
             module.weight.data.fill_(1.0)
+
+    def get_head_mask(self, head_mask, num_hidden_layers, is_attention_chunked=False):
+        if head_mask is not None:
+            raise NotImplementedError("UnimerSwin head_mask is not supported with Transformers 5.x")
+        return [None] * num_hidden_layers
 
 
 SWIN_START_DOCSTRING = r"""

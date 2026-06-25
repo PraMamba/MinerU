@@ -609,6 +609,15 @@ def test_settings_from_env_and_cli_help(monkeypatch: pytest.MonkeyPatch) -> None
     assert "--upstream-url" in result.output
 
 
+def test_llm_wiki_start_script_enables_formula_and_table_by_default() -> None:
+    script = Path("scripts/mineru_llm_wiki_v4_adapter.sh").read_text(encoding="utf-8")
+
+    assert 'MINERU_V4_ADAPTER_FORMULA_ENABLE="${MINERU_V4_ADAPTER_FORMULA_ENABLE:-true}"' in script
+    assert 'MINERU_V4_ADAPTER_TABLE_ENABLE="${MINERU_V4_ADAPTER_TABLE_ENABLE:-true}"' in script
+    assert '--formula-enable' in script
+    assert '--table-enable' in script
+
+
 def test_route_surface_contains_llm_wiki_endpoints() -> None:
     app = create_app(settings=AdapterSettings(upstream_url="http://upstream.test"))
     paths = {route.path for route in app.routes}
